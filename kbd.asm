@@ -20,7 +20,53 @@ org 0x100
     pop     word [es:9*4+2]
     sti
 
+	call	write_buffer
+
     ret
+
+write_buffer:
+	lea		bx, [kbdcodes]
+	mov		cx, 128
+all_codes:
+	xor		ax, ax
+	mov		al, [bx]
+	or		al, al
+	jz 		end_codes
+	call write_hex
+	inc		bx
+	loop	all_codes
+end_codes:
+	ret
+
+write_hex:
+	push	cx
+	push	ax
+	mov		cx, 2
+write_hex_loop:
+	rol		al, 4
+	push	ax
+	and		al, 0xf
+	add		al, '0'
+	cmp		al, '9'
+	jbe		no_add
+	add		al, 'A' - '0' - 10
+no_add:
+	call	write
+	pop		ax
+	loop	write_hex_loop
+	mov		al, ' '
+	call	write
+	pop		ax
+	pop		cx
+	ret
+
+write:
+	pusha
+	mov		ah, 2
+	mov		dl, al
+	int		0x21
+	popa
+	ret
 
 test:
     mov     ah, 9
@@ -51,6 +97,14 @@ irq1isr:
     ; read keyboard scan code
     in      al, 0x60
 
+	mov		bx, [cs:kbdindex]
+	cmp		bx, 128
+	jae		skip_code
+	mov		[cs:bx+kbdcodes], al
+	inc		bx
+	mov		[cs:kbdindex], bx
+skip_code:
+
     ; update keyboard state
     xor     bh, bh
     mov     bl, al
@@ -73,6 +127,10 @@ irq1isr:
 
     popa
     iret
+
+kbdindex	dw 0
+kbdcodes:
+	times	128 db 0
 
 kbdbuf:
     times   128 db 0

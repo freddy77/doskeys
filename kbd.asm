@@ -4,6 +4,13 @@ bits 16
 org 0x100
 
     xor     ax, ax
+
+	; clear bss segment
+	cld
+	lea	di, [bss_start]
+	mov	cx, (bss_end-bss_start)/2
+	rep	stosw
+
     mov     es, ax
 
     cli                         ; update ISR address w/ ints disabled
@@ -20,47 +27,33 @@ org 0x100
     pop     word [es:9*4+2]
     sti
 
-	call	write_buffer
-
     ret
 
-write_buffer:
-	lea		bx, [kbdcodes]
-	mov		cx, 128
-all_codes:
-	xor		ax, ax
-	mov		al, [bx]
-	or		al, al
-	jz 		end_codes
-	call write_hex
-	inc		bx
-	loop	all_codes
-end_codes:
-	ret
-
+; print al in hexadecimal
 write_hex:
 	push	cx
 	push	ax
-	mov		cx, 2
+	mov	cx, 2
 write_hex_loop:
-	rol		al, 4
+	rol	al, 4
 	push	ax
-	and		al, 0xf
-	add		al, '0'
-	cmp		al, '9'
-	jbe		no_add
-	add		al, 'A' - '0' - 10
+	and	al, 0xf
+	add	al, '0'
+	cmp	al, '9'
+	jbe	no_add
+	add	al, 'A' - '0' - 10
 no_add:
-	call	write
-	pop		ax
+	call	write_char
+	pop	ax
 	loop	write_hex_loop
-	mov		al, ' '
-	call	write
-	pop		ax
-	pop		cx
+	mov	al, ' '
+	call	write_char
+	pop	ax
+	pop	cx
 	ret
 
-write:
+; write al to output
+write_char:
 	pusha
 	mov		ah, 2
 	mov		dl, al
@@ -69,49 +62,54 @@ write:
 	ret
 
 test:
-    mov     ah, 9
-    mov     dx, msg1
-    int     0x21                ; print "Press and hold ESC"
+	mov     ah, 9
+	mov     dx, msg1
+	int     0x21                ; print "Press ESC to exit"
 
-test1:
-    mov     al, [kbdbuf + 1]    ; check Escape key state (Esc scan code = 1)
-    or      al, al
-    jz      test1               ; wait until it's nonzero (pressed/held)
-
-    mov     dx, msg2
-    int     0x21                ; print "ESC pressed, release ESC"
-
-test2:
-    mov     al, [kbdbuf + 1]    ; check Escape key state (Esc scan code = 1)
-    or      al, al
-    jnz     test2               ; wait until it's zero (released/not pressed)
-
-    mov     dx, msg3            ; print "ESC released"
-    int     0x21
-
-    ret
+	; print and clear input buffer
+	mov	si, 0
+get_key:
+	mov	al, [si+kbdcodes]
+	or	al, al
+	jnz	handle_key
+	hlt
+	jmp	get_key
+handle_key:
+	; if ESC exit
+	cmp	al, 0x1
+	je	got_esc
+	; print scancode and remove from buffer
+	mov	byte [si+kbdcodes], 0
+	call	write_hex
+	inc	si
+	and	si, 0x7f
+	jmp	get_key
+got_esc:
+	mov     ah, 9
+	mov     dx, msg2
+	int     0x21
+	ret
 
 irq1isr:
-    pusha
+	push	ds
+	push	es
+	push	cs
+	pop	ds
+	push	cs
+	pop	es
+	pusha
 
-    ; read keyboard scan code
-    in      al, 0x60
+	; read keyboard scan code
+	in      al, 0x60
 
-	mov		bx, [cs:kbdindex]
-	cmp		bx, 128
-	jae		skip_code
-	mov		[cs:bx+kbdcodes], al
-	inc		bx
-	mov		[cs:kbdindex], bx
+	mov	bx, [kbdindex]
+	cmp	byte [bx+kbdcodes], 0
+	jne	skip_code
+	mov	[bx+kbdcodes], al
+	inc	bx
+	and	bx, 0x7f
+	mov	[kbdindex], bx
 skip_code:
-
-    ; update keyboard state
-    xor     bh, bh
-    mov     bl, al
-    and     bl, 0x7F            ; bx = scan code
-    shr     al, 7               ; al = 0 if pressed, 1 if released
-    xor     al, 1               ; al = 1 if pressed, 0 if released
-    mov     [cs:bx+kbdbuf], al
 
     ; send EOI to XT keyboard
     in      al, 0x61
@@ -125,17 +123,19 @@ skip_code:
     mov     al, 0x20
     out     0x20, al
 
-    popa
-    iret
+	popa
+	pop	es
+	pop	ds
+	iret
 
-kbdindex	dw 0
-kbdcodes:
-	times	128 db 0
+msg1 db "Press ESC to exit", 13, 10, "$"
+msg2 db 13, 10, "Goodbye", 13, 10, "$"
 
-kbdbuf:
-    times   128 db 0
+align 2
 
-msg1 db "Press and hold ESC", 13, 10, "$"
-msg2 db "ESC pressed, release ESC", 13, 10, "$"
-msg3 db "ESC released", 13, 10, "$"
+section .bss
 
+bss_start:
+kbdindex: resw 1
+kbdcodes: resb 128
+bss_end:

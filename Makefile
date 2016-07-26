@@ -9,6 +9,6 @@ clean::
 
 images:: kbd.com
 	cp -f freedos.img fdboot.img
-	-mdel a:kbd.com > /dev/null 2>&1
+	mdel a:kbd.com > /dev/null 2>&1 || true
 	mcopy kbd.com a:KBD.COM
 	mkisofs -pad -b fdboot.img -R -o cd.iso fdboot.img

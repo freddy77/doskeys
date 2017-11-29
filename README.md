@@ -22,6 +22,9 @@ floppy disk image.
 `make images` command will compile the program and build floppy
 and cd image.
 
+`make qemu` command will try to launch Qemu with the prepared CD
+image. Quick way to test the program.
+
 How to use the floppy image
 ---------------------------
  1. write to a physical floppy (quite hard these days)

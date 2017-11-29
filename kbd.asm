@@ -1,9 +1,24 @@
 ; compile with NASM: nasm.exe -f bin kbd.asm -o kbd.com
 
 bits 16
+%ifndef MBR
 org 0x100
+%else
+org 0x7c00
+%endif
 
-    xor     ax, ax
+	xor     ax, ax
+
+%ifdef MBR
+	mov	sp, 0x8000
+	mov	ss, ax
+	mov	ds, ax
+	mov	es, ax
+	push	ax
+	push	back_to_zero_segment
+	retf
+back_to_zero_segment:
+%endif
 
 	; clear bss segment
 	cld
@@ -55,16 +70,24 @@ no_add:
 ; write al to output
 write_char:
 	pusha
+%ifndef MBR
 	mov		ah, 2
 	mov		dl, al
 	int		0x21
+%else
+	mov		ah, 0xe
+	mov		bx, 7
+	int		0x10
+%endif
 	popa
 	ret
 
 test:
+%ifndef MBR
 	mov     ah, 9
 	mov     dx, msg1
 	int     0x21                ; print "Press ESC to exit"
+%endif
 
 	; print and clear input buffer
 	mov	si, 0
@@ -75,6 +98,8 @@ get_key:
 	hlt
 	jmp	get_key
 handle_key:
+
+%ifndef MBR
 	; if ESC exit
 	cmp	al, 0x1
 	jne	no_esc_key
@@ -84,6 +109,8 @@ handle_key:
 	int     0x21
 	ret
 no_esc_key:
+%endif
+
 	; print scancode and remove from buffer
 	mov	byte [si+kbdcodes], 0
 	call	write_hex
@@ -129,10 +156,17 @@ skip_code:
 	pop	ds
 	iret
 
+%ifndef MBR
 msg1 db "Press ESC to exit", 13, 10, "$"
 msg2 db 13, 10, "Goodbye", 13, 10, "$"
+%endif
 
 align 2
+
+%ifdef MBR
+times 510-($-$$) db 0
+dw 0xaa55
+%endif
 
 section .bss
 

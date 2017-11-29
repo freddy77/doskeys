@@ -77,18 +77,19 @@ get_key:
 handle_key:
 	; if ESC exit
 	cmp	al, 0x1
-	je	got_esc
+	jne	no_esc_key
+
+	mov     ah, 9
+	mov     dx, msg2
+	int     0x21
+	ret
+no_esc_key:
 	; print scancode and remove from buffer
 	mov	byte [si+kbdcodes], 0
 	call	write_hex
 	inc	si
 	and	si, 0x7f
 	jmp	get_key
-got_esc:
-	mov     ah, 9
-	mov     dx, msg2
-	int     0x21
-	ret
 
 irq1isr:
 	push	ds

@@ -22,7 +22,7 @@ back_to_zero_segment:
 
 	; clear bss segment
 	cld
-	lea	di, [bss_start]
+	mov	di, bss_start
 	mov	cx, (bss_end-bss_start)/2
 	rep	stosw
 

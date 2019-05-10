@@ -49,18 +49,18 @@ write_hex:
 	push	cx
 	push	ax
 	mov	cx, 2
-write_hex_loop:
+.loop:
 	rol	al, 4
 	push	ax
 	and	al, 0xf
 	add	al, '0'
 	cmp	al, '9'
-	jbe	no_add
+	jbe	.no_add
 	add	al, 'A' - '0' - 10
-no_add:
+.no_add:
 	call	write_char
 	pop	ax
-	loop	write_hex_loop
+	loop	.loop
 	mov	al, ' '
 	call	write_char
 	pop	ax
